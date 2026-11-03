@@ -1,0 +1,5 @@
+xr-hexagonrpc (0.1.0) unstable; urgency=medium
+
+  * Import independently maintained XR component and packaging.
+
+ -- openKylin XR SIG <xr@lists.openkylin.top>  Tue, 03 Nov 2026 13:33:29 +0800

@@ -38,7 +38,10 @@
 
 struct apps_mem_ctx {
 	int fd;
+	struct a081_shared_map *shared_maps;
 };
+
+#include "a081_apps_mem_share.inc"
 
 static uint32_t apps_mem_request_map64(void *data,
 				       const struct fastrpc_io_buffer *inbufs,
@@ -121,6 +124,7 @@ err_free_iface:
 
 void fastrpc_apps_mem_deinit(struct fastrpc_interface *iface)
 {
+	a081_apps_mem_cleanup(iface->data);
 	free(iface->data);
 	free(iface);
 }
@@ -130,8 +134,8 @@ static const struct fastrpc_function_impl apps_mem_procs[] = {
 	{ .def = NULL, .impl = NULL, },
 	{ .def = &apps_mem_request_map64_def, .impl = apps_mem_request_map64, },
 	{ .def = NULL, .impl = NULL, },
-	{ .def = NULL, .impl = NULL, },
-	{ .def = NULL, .impl = NULL, },
+	{ .def = &apps_mem_share_map_def, .impl = a081_apps_mem_share_map, },
+	{ .def = &apps_mem_share_unmap_def, .impl = a081_apps_mem_share_unmap, },
 };
 
 const struct fastrpc_interface apps_mem_interface = {

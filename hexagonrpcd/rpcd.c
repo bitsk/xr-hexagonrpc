@@ -19,6 +19,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <dlfcn.h>
+#include <pthread.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libhexagonrpc/error.h>
@@ -43,6 +45,56 @@
 #include "listener.h"
 #include "localctl.h"
 #include "rpcd_builder.h"
+
+/* Private -P mode owns a single session. The plugin executes in a thread so
+ * its DMA-buf fd numbers are valid in the reverse-call listener's fd table. */
+extern void a081_apps_mem_counters(uint64_t out[4]);
+struct plugin_client { void *library; int (*entry)(void); };
+static void *plugin_thread(void *arg)
+{
+	struct plugin_client *client = arg;
+	int rc = client->entry();
+	uint64_t counts[4];
+	a081_apps_mem_counters(counts);
+	fprintf(stderr, "stage=plugin_exit rc=%d share_maps=%llu share_unmaps=%llu live=%llu errors=%llu\n",
+		rc, (unsigned long long)counts[0], (unsigned long long)counts[1],
+		(unsigned long long)counts[2], (unsigned long long)counts[3]);
+	/* Exit this private process, releasing its FastRPC session. No other
+	 * clients are allowed in -P mode. The system sensor daemon is separate. */
+	exit(rc == 0 ? 0 : 1);
+	return NULL;
+}
+static int start_plugin(const char *path)
+{
+	struct plugin_client *client = calloc(1, sizeof(*client));
+	pthread_t thread;
+	int rc;
+	void *symbol;
+	if (!client) return 1;
+	client->library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+	if (!client->library) {
+		fprintf(stderr, "stage=plugin_load error=%s\n", dlerror());
+		free(client);
+		return 1;
+	}
+	symbol = dlsym(client->library, "a081_qvr_client_main");
+	memcpy(&client->entry, &symbol, sizeof(client->entry));
+	if (!client->entry) {
+		fprintf(stderr, "stage=plugin_symbol error=%s\n", dlerror());
+		dlclose(client->library);
+		free(client);
+		return 1;
+	}
+	rc = pthread_create(&thread, NULL, plugin_thread, client);
+	if (rc) {
+		fprintf(stderr, "stage=plugin_thread rc=%d\n", rc);
+		dlclose(client->library);
+		free(client);
+		return 1;
+	}
+	pthread_detach(thread);
+	return 0;
+}
 
 static int register_fastrpc_listener(int fd)
 {
@@ -76,6 +128,7 @@ static void print_usage(const char *argv0)
 	       "\t-d DSP\t\tDSP name (default: "")\n"
 	       "\t-f DEVICE\tFastRPC device node to attach to\n"
 	       "\t-p PROGRAM\tRun client program with shared file descriptor\n"
+	       "\t-P PLUGIN\tRun one in-process A081 client plugin; exit when it returns\n"
 	       "\t-R DIR\t\tRoot directory of served files (default: /usr/share/qcom/)\n"
 	       "\t-s\t\tAttach to sensorspd\n"
 	       "\t-h\t\tPrint help and exit\n");
@@ -199,6 +252,10 @@ static void *start_reverse_tunnel(int fd, const char *device_dir, const char *ds
 	if (ifaces == NULL)
 		return NULL;
 
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_fs prefix=%s dsp=%s library_root=%s/dsp/%s\n",
+		device_dir, dsp, device_dir, dsp);
+#endif
 	root_dir = construct_root_dir(device_dir, dsp);
 
 	/*
@@ -218,6 +275,7 @@ static void *start_reverse_tunnel(int fd, const char *device_dir, const char *ds
 
 	run_fastrpc_listener(fd, n_ifaces, ifaces);
 
+	fastrpc_apps_mem_deinit(ifaces[2]);
 	fastrpc_localctl_deinit(ifaces[REMOTECTL]);
 
 	free(ifaces);
@@ -350,12 +408,18 @@ int main(int argc, char* argv[])
 	const char *device_dir = "/usr/share/qcom/";
 	const char *dsp = "";
 	const char *create_shell = NULL;
+	const char *plugin = NULL;
 	const char *guessed_device_dir;
 	const char **progs;
 	pid_t *pids;
 	size_t n_progs = 0;
 	int fd, ret, opt;
 	bool attach_sns = false;
+#ifdef HEXAGONRPC_VERBOSE
+	/* Preserve successful file-open/read traces when a timeout kills us. */
+	setvbuf(stdout, NULL, _IOLBF, 0);
+	setvbuf(stderr, NULL, _IOLBF, 0);
+#endif
 
 	progs = malloc(sizeof(const char *) * argc);
 	if (progs == NULL) {
@@ -373,7 +437,7 @@ int main(int argc, char* argv[])
 	if (guessed_device_dir != NULL)
 		device_dir = guessed_device_dir;
 
-	while ((opt = getopt(argc, argv, "c:d:f:p:R:sh")) != -1) {
+	while ((opt = getopt(argc, argv, "c:d:f:p:P:R:sh")) != -1) {
 		switch (opt) {
 			case 'c':
 				create_shell = optarg;
@@ -387,6 +451,9 @@ int main(int argc, char* argv[])
 			case 'p':
 				progs[n_progs] = optarg;
 				n_progs++;
+				break;
+			case 'P':
+				plugin = optarg;
 				break;
 			case 'R':
 				device_dir = optarg;
@@ -402,6 +469,11 @@ int main(int argc, char* argv[])
 				print_usage(argv[0]);
 				goto err_free_pids;
 		}
+	}
+
+	if (plugin && n_progs != 0) {
+		fprintf(stderr, "-P cannot be combined with -p\n");
+		goto err_free_pids;
 	}
 
 	if (!fastrpc_node) {
@@ -438,7 +510,16 @@ int main(int argc, char* argv[])
 	if (ret)
 		goto err_close_dev;
 
+	if (plugin && start_plugin(plugin))
+		goto err_close_dev;
+
 	start_reverse_tunnel(fd, device_dir, dsp);
+
+	/* Successful -P completion exits from plugin_thread after all cleanup. */
+	if (plugin) {
+		fprintf(stderr, "stage=listener_exit rc=1 message=listener_ended_before_plugin\n");
+		goto err_close_dev;
+	}
 
 	terminate_clients(n_progs, pids);
 

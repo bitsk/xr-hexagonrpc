@@ -25,5 +25,7 @@
 #include <libhexagonrpc/hexagonrpc.h>
 
 extern struct hrpc_method_def_interp4 apps_mem_request_map64_def;
+extern const struct hrpc_method_def_interp4 apps_mem_share_map_def;
+extern const struct hrpc_method_def_interp4 apps_mem_share_unmap_def;
 
 #endif /* INTERFACE_APPS_MEM_H */

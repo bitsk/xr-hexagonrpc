@@ -40,3 +40,25 @@ const struct hrpc_method_def_interp4 apps_mem_request_map64_def = {
 	.n_inner_types = 0,
 	.inner_types = NULL,
 };
+
+/* A081 DSP apps_mem stubs: share_map scalar0x04010100, share_unmap0x05010000. */
+static const struct hrpc_arg_def_interp4 apps_mem_share_map_args[] = {
+	{ HRPC_ARG_WORD, sizeof(uint32_t) },
+	{ HRPC_ARG_WORD, sizeof(uint32_t) },
+	{ HRPC_ARG_OUT_BLOB, sizeof(uint64_t) },
+	{ HRPC_ARG_OUT_BLOB, sizeof(uint64_t) },
+};
+const struct hrpc_method_def_interp4 apps_mem_share_map_def = {
+	.msg_id = 4,
+	.n_args = HRPC_ARRAY_SIZE(apps_mem_share_map_args),
+	.args = apps_mem_share_map_args,
+};
+static const struct hrpc_arg_def_interp4 apps_mem_share_unmap_args[] = {
+	{ HRPC_ARG_WORD, sizeof(uint64_t) },
+	{ HRPC_ARG_WORD, sizeof(uint32_t) },
+};
+const struct hrpc_method_def_interp4 apps_mem_share_unmap_def = {
+	.msg_id = 5,
+	.n_args = HRPC_ARRAY_SIZE(apps_mem_share_unmap_args),
+	.args = apps_mem_share_unmap_args,
+};

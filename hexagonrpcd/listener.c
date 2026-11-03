@@ -19,6 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 #include <inttypes.h>
 #include <libhexagonrpc/error.h>
 #include <libhexagonrpc/hexagonrpc.h>
@@ -443,11 +444,23 @@ static int return_for_next_invoke(int fd,
 		outbufs_encode(REMOTE_SCALARS_OUTBUFS(*sc), returned, outbufs);
 	}
 
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_next_begin rctx=%u reply_result=0x%08x reply_sc=0x%08x reply_bytes=%u\n",
+		rctx ? *rctx : 0, result, *sc, outbufs_len);
+	errno = 0;
+#endif
 	ret = adsp_listener_next2(fd,
 				  *rctx, result,
 				  outbufs_len, outbufs,
 				  rctx, handle, sc,
 				  &inbufs_len, 256, inbufs);
+#ifdef HEXAGONRPC_VERBOSE
+	if (ret)
+		fprintf(stderr, "stage=reverse_next_end rc=%d errno=%d\n", ret, ret == -1 ? errno : 0);
+	else
+		fprintf(stderr, "stage=reverse_next_end rc=0 errno=0 rctx=%u handle=%u sc=0x%08x input_bytes=%u\n",
+			*rctx, *handle, *sc, inbufs_len);
+#endif
 	if (ret) {
 		if (ret == -1)
 			perror("Could not fetch next FastRPC message");
@@ -555,7 +568,16 @@ static int invoke_requested_procedure(size_t n_ifaces,
 		return 1;
 	}
 
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_dispatch iface=%s handle=%u method=%u sc=0x%08x in=%u out=%u\n",
+		ifaces[handle]->name, handle, method, sc,
+		REMOTE_SCALARS_INBUFS(sc), REMOTE_SCALARS_OUTBUFS(sc));
+#endif
 	*result = impl->impl(ifaces[handle]->data, decoded, *returned);
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_result iface=%s method=%u result=0x%08x\n",
+		ifaces[handle]->name, method, *result);
+#endif
 
 	return 0;
 }
@@ -573,7 +595,14 @@ int run_fastrpc_listener(int fd,
 	uint32_t n_outbufs = 0;
 	int ret;
 
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_init2_begin fd=%d\n", fd);
+	errno = 0;
+#endif
 	ret = adsp_listener_init2(fd);
+#ifdef HEXAGONRPC_VERBOSE
+	fprintf(stderr, "stage=reverse_init2_end rc=%d errno=%d\n", ret, ret == -1 ? errno : 0);
+#endif
 	if (ret) {
 		fprintf(stderr, "Could not initialize the listener: %u\n", ret);
 		return ret;
