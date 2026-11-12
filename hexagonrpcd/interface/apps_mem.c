@@ -62,3 +62,13 @@ const struct hrpc_method_def_interp4 apps_mem_share_unmap_def = {
 	.n_args = HRPC_ARRAY_SIZE(apps_mem_share_unmap_args),
 	.args = apps_mem_share_unmap_args,
 };
+
+static const struct hrpc_arg_def_interp4 a081_apps_mem_request_unmap64_args[] = {
+    { HRPC_ARG_WORD, sizeof(uint64_t) },
+    { HRPC_ARG_WORD, sizeof(uint64_t) },
+};
+const struct hrpc_method_def_interp4 a081_apps_mem_request_unmap64_def = {
+    .msg_id = 3,
+    .n_args = HRPC_ARRAY_SIZE(a081_apps_mem_request_unmap64_args),
+    .args = a081_apps_mem_request_unmap64_args,
+};

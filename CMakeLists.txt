@@ -13,3 +13,10 @@ configure_package_config_file(cmake/XRHexagonRPCConfig.cmake.in ${CMAKE_CURRENT_
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/XRHexagonRPCConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/XRHexagonRPC)
 install(DIRECTORY include libhexagonrpc hexagonrpcd DESTINATION ${CMAKE_INSTALL_DATADIR}/xr-hexagonrpc/source)
 install(FILES COPYING DESTINATION ${CMAKE_INSTALL_DATADIR}/xr-hexagonrpc/source)
+
+set(RPCD_SOURCES apps_mem.c apps_std.c interface/adsp_default_listener.c interface/adsp_listener.c interface/apps_mem.c interface/apps_std.c hexagonfs.c hexagonfs_mapped.c hexagonfs_plat_subtype_name.c hexagonfs_virt_dir.c iobuffer.c listener.c localctl.c rpcd.c rpcd_builder.c)
+list(TRANSFORM RPCD_SOURCES PREPEND "hexagonrpcd/")
+add_executable(xr-hexagonrpcd ${RPCD_SOURCES})
+target_link_libraries(xr-hexagonrpcd PRIVATE xr_hexagonrpc pthread dl)
+target_link_options(xr-hexagonrpcd PRIVATE -Wl,--export-dynamic)
+install(TARGETS xr-hexagonrpcd RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

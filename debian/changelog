@@ -1,3 +1,9 @@
+xr-hexagonrpc (0.5.1) unstable; urgency=medium
+
+  * Package the daemon, explicit unsigned PD mode and owned DMA cleanup.
+
+ -- bits <bigbits@hackx.cc>  Thu, 12 Nov 2026 10:43:15 +0800
+
 xr-hexagonrpc (0.5.0+xr1) unstable; urgency=medium
 
   * Import independently maintained XR component and packaging.

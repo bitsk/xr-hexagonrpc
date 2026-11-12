@@ -63,10 +63,11 @@ static uint32_t apps_mem_request_map64(void *data,
 	struct fastrpc_req_mmap mmap;
 	int ret;
 
-	if (!(first_in->rflags & ADSP_MMAP_ADD_PAGES)) {
-		fprintf(stderr, "Unsupported mmap operation: DMA buffer request\n");
-		return AEE_EUNSUPPORTED;
-	}
+	if (inbufs[0].s < sizeof(*first_in) || outbufs[0].s < sizeof(*first_out))
+		return AEE_EBADPARM;
+	if (!(first_in->rflags & ADSP_MMAP_ADD_PAGES))
+		return a081_apps_mem_request_dma64(data, first_in->heap_id,
+			first_in->lflags, first_in->rflags, first_in->vin, first_in->len, outbufs);
 
 	mmap.fd = -1;
 	mmap.flags = first_in->rflags;
@@ -133,7 +134,7 @@ static const struct fastrpc_function_impl apps_mem_procs[] = {
 	{ .def = NULL, .impl = NULL, },
 	{ .def = NULL, .impl = NULL, },
 	{ .def = &apps_mem_request_map64_def, .impl = apps_mem_request_map64, },
-	{ .def = NULL, .impl = NULL, },
+	{ .def = &a081_apps_mem_request_unmap64_def, .impl = a081_apps_mem_request_unmap64, },
 	{ .def = &apps_mem_share_map_def, .impl = a081_apps_mem_share_map, },
 	{ .def = &apps_mem_share_unmap_def, .impl = a081_apps_mem_share_unmap, },
 };

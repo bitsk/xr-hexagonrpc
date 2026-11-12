@@ -19,3 +19,10 @@ Architecture: all
 Depends: ${misc:Depends}
 Description: XR FastRPC source input for Bionic compatibility builds
  Independently maintained XR component for openKylin integration.
+
+Package: xr-hexagonrpc-daemon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: XR FastRPC listener and private process-domain host
+ Provides shared DSP file services and opt-in client plugins. Installing this
+ package does not start a DSP process or acquire camera hardware.

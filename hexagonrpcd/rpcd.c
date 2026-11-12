@@ -142,10 +142,15 @@ static int create_shell_pd(int fd, const char *create_shell)
 	struct fastrpc_alloc_dma_buf dmabuf;
 	long page_size;
 	struct fastrpc_init_create init = {
-		.attrs = 0,
+		.attrs = getenv("XR_FASTRPC_UNSIGNED_PD") && !strcmp(getenv("XR_FASTRPC_UNSIGNED_PD"), "1") ? FASTRPC_MODE_UNSIGNED_MODULE : 0,
 		.siglen = 0,
 	};
 
+	if (init.attrs) {
+		const char *last = strrchr(create_shell, '/');
+		if (strcmp(last ? last + 1 : create_shell, "fastrpc_shell_unsigned_3")) return -1;
+		fprintf(stderr, "stage=private_pd attrs=0x%x shell=%s\n", init.attrs, create_shell);
+	}
 	shellfd = open(create_shell, O_RDONLY);
 	if (shellfd == -1) {
 		fprintf(stderr, "Could not open %s: %s\n",
