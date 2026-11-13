@@ -1,3 +1,9 @@
+xr-hexagonrpc (0.5.2) unstable; urgency=medium
+
+  * Restore the bounded entropy mapping required by the signed head tracker.
+
+ -- bits <bigbits@hackx.cc>  Fri, 13 Nov 2026 10:57:02 +0800
+
 xr-hexagonrpc (0.5.1) unstable; urgency=medium
 
   * Package the daemon, explicit unsigned PD mode and owned DMA cleanup.

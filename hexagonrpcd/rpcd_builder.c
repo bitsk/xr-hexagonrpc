@@ -182,7 +182,10 @@ struct hexagonfs_dirent *construct_root_dir(const char *prefix, const char *dsp)
 				)
 			);
 
-	return hfs_mkdir("/", 6,
+	return hfs_mkdir("/", 7,
+			hfs_mkdir("dev", 1,
+				hfs_map("urandom", "/dev/urandom")
+			),
 			hfs_mkdir("mnt", 1,
 				hfs_mkdir("vendor", 1,
 					persist_dir
