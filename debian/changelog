@@ -1,3 +1,10 @@
+xr-hexagonrpc (0.5.6) unstable; urgency=medium
+
+  * Let plugins opt in to synchronous termination with blocked RPC threads.
+  * Abort private listener failures without unmapping DMA under a live plugin.
+
+ -- bits <bigbits@hackx.cc>  Tue, 17 Nov 2026 03:39:43 +0800
+
 xr-hexagonrpc (0.5.5) unstable; urgency=medium
 
   * Finish reverse-listener initialization before publishing plugin endpoints.

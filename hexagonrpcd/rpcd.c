@@ -70,6 +70,7 @@ static int start_plugin(const char *path)
 	pthread_t thread;
 	int rc;
 	void *symbol;
+	int (*synchronous_signals)(void) = NULL;
 	if (!client) return 1;
 	client->library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
 	if (!client->library) {
@@ -84,6 +85,27 @@ static int start_plugin(const char *path)
 		dlclose(client->library);
 		free(client);
 		return 1;
+	}
+	/* Opt-in contract: the plugin consumes SIGTERM/SIGINT through signalfd.
+	 * Block them before creating any plugin workers and before next2. A signal
+	 * must not restart an in-flight FastRPC ioctl as a second DSP request.
+	 * Older head/controller plugins retain their existing signal contract. */
+	symbol = dlsym(client->library, "a081_qvr_client_synchronous_signals");
+	memcpy(&synchronous_signals, &symbol, sizeof(synchronous_signals));
+	if (synchronous_signals) {
+		sigset_t blocked;
+		sigemptyset(&blocked);
+		sigaddset(&blocked, SIGTERM);
+		sigaddset(&blocked, SIGINT);
+		rc = synchronous_signals() == 1 ?
+			pthread_sigmask(SIG_BLOCK, &blocked, NULL) : EINVAL;
+		if (rc) {
+			fprintf(stderr, "stage=plugin_signal_contract rc=%d\n", rc);
+			dlclose(client->library);
+			free(client);
+			return 1;
+		}
+		fprintf(stderr, "stage=plugin_signal_contract mode=signalfd\n");
 	}
 	rc = pthread_create(&thread, NULL, plugin_thread, client);
 	if (rc) {
@@ -301,7 +323,14 @@ static void *start_reverse_tunnel(int fd, const char *device_dir, const char *ds
 	if (plugin && start_plugin(plugin))
 		goto err;
 
-	run_fastrpc_listener(fd, n_ifaces, ifaces);
+	ret = run_fastrpc_listener(fd, n_ifaces, ifaces);
+	if (plugin) {
+		/* The detached plugin can still be using mapped DMA. A failed reverse
+		 * listener cannot coordinate its stop/unmap calls. End the private
+		 * process as one unit; never unmap beneath a live plugin thread. */
+		fprintf(stderr, "stage=listener_exit rc=%d message=private_session_abort_without_host_unmap\n", ret);
+		_exit(4);
+	}
 
 err:
 	fastrpc_apps_mem_deinit(ifaces[2]);
