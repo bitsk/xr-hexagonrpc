@@ -61,7 +61,10 @@ static void *plugin_thread(void *arg)
 		(unsigned long long)counts[2], (unsigned long long)counts[3]);
 	/* Exit this private process, releasing its FastRPC session. No other
 	 * clients are allowed in -P mode. The system sensor daemon is separate. */
-	exit(rc == 0 ? 0 : 1);
+	/* Preserve the plugin contract, including rc=3 which requires the
+	 * parent to verify PD reclamation after this process exits. Do not
+	 * convert that pending verification to success or generic failure. */
+	exit(rc >= 0 && rc <= 255 ? rc : 1);
 	return NULL;
 }
 static int start_plugin(const char *path)
