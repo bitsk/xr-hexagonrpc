@@ -584,6 +584,15 @@ static int invoke_requested_procedure(size_t n_ifaces,
 	return 0;
 }
 
+int init_fastrpc_listener(int fd)
+{
+	int ret = adsp_listener_init2(fd);
+	int saved_errno = ret == -1 ? errno : 0;
+	fprintf(stderr, "stage=reverse_init2_end rc=%d rc_hex=0x%08x errno=%d\n",
+		ret, (unsigned int)ret, saved_errno);
+	return ret;
+}
+
 int run_fastrpc_listener(int fd,
 			 size_t n_ifaces,
 			 struct fastrpc_interface **ifaces)
@@ -595,20 +604,7 @@ int run_fastrpc_listener(int fd,
 	uint32_t rctx = 0;
 	uint32_t sc = REMOTE_SCALARS_MAKE(0, 0, 0);
 	uint32_t n_outbufs = 0;
-	int ret;
-
-#ifdef HEXAGONRPC_VERBOSE
-	fprintf(stderr, "stage=reverse_init2_begin fd=%d\n", fd);
-	errno = 0;
-#endif
-	ret = adsp_listener_init2(fd);
-#ifdef HEXAGONRPC_VERBOSE
-	fprintf(stderr, "stage=reverse_init2_end rc=%d errno=%d\n", ret, ret == -1 ? errno : 0);
-#endif
-	if (ret) {
-		fprintf(stderr, "Could not initialize the listener: %u\n", ret);
-		return ret;
-	}
+	int ret = 0;
 
 	while (!ret) {
 		ret = return_for_next_invoke(fd,

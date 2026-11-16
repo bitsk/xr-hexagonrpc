@@ -258,7 +258,8 @@ static int start_clients(size_t n_progs, const char **progs, pid_t *pids)
 	return 0;
 }
 
-static void *start_reverse_tunnel(int fd, const char *device_dir, const char *dsp)
+static void *start_reverse_tunnel(int fd, const char *device_dir, const char *dsp,
+				  const char *plugin)
 {
 	struct fastrpc_interface **ifaces;
 	struct hexagonfs_dirent *root_dir;
@@ -290,16 +291,22 @@ static void *start_reverse_tunnel(int fd, const char *device_dir, const char *ds
 	if (ret)
 		goto err;
 
+	ret = init_fastrpc_listener(fd);
+	if (ret)
+		goto err;
+
+	/* The plugin publishes its socket from entry(). Its endpoint must not
+	 * become visible until reverse calls can be received. Starting it before
+	 * init2 lets a warm client open a DSP module against an absent listener. */
+	if (plugin && start_plugin(plugin))
+		goto err;
+
 	run_fastrpc_listener(fd, n_ifaces, ifaces);
 
+err:
 	fastrpc_apps_mem_deinit(ifaces[2]);
 	fastrpc_localctl_deinit(ifaces[REMOTECTL]);
 
-	free(ifaces);
-
-	return NULL;
-
-err:
 	free(ifaces);
 
 	return NULL;
@@ -527,10 +534,7 @@ int main(int argc, char* argv[])
 	if (ret)
 		goto err_close_dev;
 
-	if (plugin && start_plugin(plugin))
-		goto err_close_dev;
-
-	start_reverse_tunnel(fd, device_dir, dsp);
+	start_reverse_tunnel(fd, device_dir, dsp, plugin);
 
 	/* Successful -P completion exits from plugin_thread after all cleanup. */
 	if (plugin) {
