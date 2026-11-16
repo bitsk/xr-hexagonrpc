@@ -1,3 +1,9 @@
+xr-hexagonrpc (0.5.3) unstable; urgency=medium
+
+  * Report separate transport, loader and listener registration failures.
+
+ -- bits <bigbits@hackx.cc>  Tue, 17 Nov 2026 03:03:09 +0800
+
 xr-hexagonrpc (0.5.2) unstable; urgency=medium
 
   * Restore the bounded entropy mapping required by the signed head tracker.

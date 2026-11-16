@@ -98,24 +98,36 @@ static int start_plugin(const char *path)
 
 static int register_fastrpc_listener(int fd)
 {
-	uint32_t hdl;
-	char err[256];
-	int ret;
+	const char *name = "adsp_default_listener";
+	uint32_t hdl = 0, dlerr = 0;
+	char err[256] = {0};
+	int ret, close_ret, saved_errno;
 
-	ret = hexagonrpc_open(fd, "adsp_default_listener", &hdl, 256, err);
-	if (ret) {
-		fprintf(stderr, "Could not open remote interface: %s\n", err);
-		return 1;
+	/* Keep the transport and remote loader results separate. The convenience
+	 * open wrapper reduces both to -1, losing the DSP error needed here. */
+	ret = remotectl_open(fd, strlen(name) + 1, name, &hdl,
+			     sizeof(err), err, &dlerr);
+	saved_errno = ret == -1 ? errno : 0;
+	err[sizeof(err) - 1] = '\0';
+	if (ret || dlerr) {
+		fprintf(stderr, "stage=listener_open rc=%d rc_hex=0x%08x errno=%d loader_rc=0x%08x message=%s loader_message=%s\n",
+			ret, (unsigned int)ret, saved_errno, dlerr,
+			hexagonrpc_strerror(ret), err);
+		return ret ? ret : 1;
 	}
 
 	ret = adsp_default_listener_register(fd, hdl);
-	if (ret) {
-		fprintf(stderr, "Could not register ADSP default listener\n");
-		goto err;
-	}
+	saved_errno = ret == -1 ? errno : 0;
+	fprintf(stderr, "stage=listener_register handle=0x%08x rc=%d rc_hex=0x%08x errno=%d message=%s\n",
+		hdl, ret, (unsigned int)ret, saved_errno, hexagonrpc_strerror(ret));
 
-err:
-	hexagonrpc_close(fd, hdl);
+	dlerr = 0;
+	close_ret = remotectl_close(fd, hdl, 0, NULL, &dlerr);
+	saved_errno = close_ret == -1 ? errno : 0;
+	if (close_ret || dlerr)
+		fprintf(stderr, "stage=listener_close handle=0x%08x rc=%d rc_hex=0x%08x errno=%d loader_rc=0x%08x message=%s\n",
+			hdl, close_ret, (unsigned int)close_ret, saved_errno, dlerr,
+			hexagonrpc_strerror(close_ret));
 	return ret;
 }
 
