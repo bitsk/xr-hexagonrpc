@@ -432,7 +432,9 @@ static int return_for_next_invoke(int fd,
 	uint32_t outbufs_len;
 	int ret;
 
-	outbufs_len = outbufs_calculate_size(REMOTE_SCALARS_OUTBUFS(*sc), returned);
+	/* The listener protocol sends no output buffers for a failed invoke. */
+	outbufs_len = result ? 0 :
+		outbufs_calculate_size(REMOTE_SCALARS_OUTBUFS(*sc), returned);
 
 	if (outbufs_len) {
 		outbufs = malloc(outbufs_len);
@@ -617,18 +619,27 @@ int run_fastrpc_listener(int fd,
 
 		if (returned != NULL)
 			iobuf_free(n_outbufs, returned);
+		returned = NULL;
 
 		ret = invoke_requested_procedure(n_ifaces, ifaces,
 						 handle, sc, &result,
 						 decoded, &returned);
 		if (ret)
-			break;
+			fprintf(stderr, "stage=reverse_rejected rctx=%u handle=0x%08x sc=0x%08x result=0x%08x\n",
+				rctx, handle, sc, result);
 
 		if (decoded != NULL)
 			iobuf_free(REMOTE_SCALARS_INBUFS(sc), decoded);
+		decoded = NULL;
 
 		n_outbufs = REMOTE_SCALARS_OUTBUFS(sc);
+		/* A dispatched request, including an unsupported handle or method,
+		 * must receive its error through next2. Only a transport/decode
+		 * failure ends the listener; do not strand the DSP's caller. */
+		ret = 0;
 	}
 
+	if (returned != NULL)
+		iobuf_free(n_outbufs, returned);
 	return ret;
 }

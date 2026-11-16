@@ -1,3 +1,10 @@
+xr-hexagonrpc (0.5.4) unstable; urgency=medium
+
+  * Return reverse-dispatch errors to the DSP and keep the listener alive.
+  * Omit output buffers when replying to a failed reverse invocation.
+
+ -- bits <bigbits@hackx.cc>  Tue, 17 Nov 2026 03:14:10 +0800
+
 xr-hexagonrpc (0.5.3) unstable; urgency=medium
 
   * Report separate transport, loader and listener registration failures.
